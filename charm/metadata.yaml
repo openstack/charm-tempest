@@ -1,0 +1,16 @@
+name: tempest
+summary: Openstack integration test suite
+maintainer: Liam young <liam.young@canonical.com>
+description: |
+  tempest is a set of integration tests to be run against a live Openstack
+  cluster. Tempest has batteries of tests for Openstack API validation,
+  scenarios, and other specific tests useful in validating an Openstack
+  deployment.
+tags:
+  - openstack
+subordinate: false
+requires:
+  identity-admin:
+    interface: keystone-admin
+  dashboard:
+    interface: http
