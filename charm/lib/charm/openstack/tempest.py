@@ -13,12 +13,14 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
     interface_type = "identity-admin"
 
     def __init__(self, relation):
+        self.kc = None
         super(TempestAdminAdapter, self).__init__(relation)
         self.init_keystone_client()
         self.uconfig = config()
 
     def init_keystone_client(self):
-        self.kc = None
+        if self.kc:
+            return
         self.keystone_auth_url = '{}://{}:{}/v2.0'.format(
             'http',
             self.creds['service_hostname'],
@@ -137,28 +139,23 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
 
     def get_present_services(self):
         self.init_keystone_client()
-        print(self.ks.services.list())
-        services = [svc.name for svc in self.ks.services.list() if svc.enabled]
+        services = [svc.name for svc in self.kc.services.list() if svc.enabled]
 #        if DashboardRelation().get('dashboard_url'):
 #            services.append('horizon')
-        print(services)
         return services
 
     @property
     def service_info(self):
-        services = {}
+        service_info = {}
         tempest_candidates = ['ceilometer', 'cinder', 'glance', 'heat',
                               'horizon', 'ironic', 'neutron', 'nova',
                               'sahara', 'swift', 'trove', 'zaqar', 'neutron']
-        print("1")
         present_svcs = self.get_present_services()
-        print("2")
         # If not running in an action context asssume auto mode
         try:
             action_args = action_get()
         except:
             action_args = {'service-whitelist': 'auto'}
-
         if action_args['service-whitelist'] == 'auto':
             white_list = []
             for svc in present_svcs:
@@ -168,11 +165,10 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
             white_list = action_args['service-whitelist']
         for svc in tempest_candidates:
             if svc in white_list:
-                services[svc] = 'true'
+                service_info[svc] = 'true'
             else:
-                services[svc] = 'false'
-
-
+                service_info[svc] = 'false'
+        return service_info
 
 class TempestAdapters(OpenStackRelationAdapters):
     """
@@ -215,7 +211,7 @@ class TempestCharm(OpenStackCharm):
         'python3-keystoneclient', 'python3-neutronclient', 'python3-novaclient',
         'python3-swiftclient', 'python3-ceilometerclient',
         'openvswitch-common', 'libffi-dev', 'libssl-dev', 'python-dev',
-        'python-cffi'
+        'python-cffi', 'tox'
     ]
 
     adapters_class = TempestAdapters

@@ -1,0 +1,15 @@
+run-tempest:
+  description: Run tempest
+  params:
+    service-whitelist:
+      type: string
+      description: Space seperated list services to check or auto to have the charm produce the list based on the environment
+      default: 'auto' 
+    branch:
+      type: string
+      description: Git branch
+      default: 'master'
+    run-tempest-args:
+      type: string
+      description: Args to run tempest with
+      default: '-V --smoke'
