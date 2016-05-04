@@ -1,0 +1,65 @@
+options:
+  tempest-source:
+    type: string
+    default: "https://github.com/openstack/tempest"
+    description: "Location to pull tempest source from"
+  result-format:
+    type: string
+    default: "Default Value"
+    description: "Format to return results in"
+  glance-image-name:
+    type: string
+    default: "cirros"
+    description: "Main image to use"
+  glance-alt-image-name:
+    type: string
+    default: "precise"
+    description: "Alt image to use"
+  flavor-name:
+    type: string
+    default: "m1.small"
+    description: "Main image to use"
+  flavor-alt-name:
+    type: string
+    default: "m1.medium"
+    description: "Alt image to use"
+  image-ssh-user:
+    type: string
+    default: "cirros"
+    description: "User to connect to main image as"
+  image-alt-ssh-user:
+    type: string
+    default: "ubuntu"
+    description: "User to connect to alt image as"
+  router-name:
+    type: string
+    default: "provider-router"
+    description: "neutron Router"
+  network-name:
+    type: string
+    default: "ext_net"
+    description: "neutron network"
+  swift-resource-ip:
+    type: string
+    default: "10.245.160.50"
+    description: "undercloud swift ip"
+  cidr-priv:
+    type: string
+    default: "192.168.21.0/24"
+    description: "cidr priv"
+  name-server:
+    type: string
+    default: "10.245.160.2"
+    description: "name server"
+  http-proxy:
+    type: string
+    default: ''
+    description: "http proxy address"
+  https-proxy:
+    type: string
+    default: ''
+    description: "https proxy address"
+  pip-index-url:
+    type: string
+    default: ''
+    description: "Base URL of Python Package Index"

@@ -20,5 +20,6 @@ def render_tempest_config(keystone):
     charm = tempest.TempestCharmFactory.charm(
         interfaces=[keystone]
     )
-    os.mkdir(charm.TEMPEST_LOGDIR)
+    if not os.path.isdir(charm.TEMPEST_LOGDIR):
+        os.makedirs(charm.TEMPEST_LOGDIR)
     charm.render_all_configs()
