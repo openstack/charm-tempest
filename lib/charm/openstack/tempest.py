@@ -1,26 +1,24 @@
-from urllib.parse import urlparse
-from charm.openstack.charm import OpenStackCharmFactory, OpenStackCharm
-from charm.openstack.adapters import (
-    OpenStackRelationAdapters,
-    OpenStackRelationAdapter,
-    ConfigurationAdapter,
-)
-from charmhelpers.core.hookenv import log, config, action_get
-from keystoneclient.v2_0 import client as keystoneclient
 import glanceclient
-from neutronclient.v2_0 import client as neutronclient
-from novaclient import client as novaclient
+import keystoneclient.v2_0 as keystoneclient
+import neutronclient.v2_0.client as neutronclient
+import novaclient.v2 as novaclient
+import urllib
 
-charm = None
+import charm.openstack.charm as charm
+import charm.openstack.adapters as adapters
+import charmhelpers.core.hookenv as hookenv
+
+tempest_charm = None
 
 
 def get_charm():
-    global charm
-    if charm is None:
-        charm = TempestCharmFactory.charm()
-    return charm
+    global tempest_charm
+    if tempest_charm is None:
+        tempest_charm = TempestCharmFactory.charm()
+    return tempest_charm
 
-class TempestAdminAdapter(OpenStackRelationAdapter):
+
+class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
     interface_type = "identity-admin"
 
@@ -28,7 +26,7 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
         self.kc = None
         super(TempestAdminAdapter, self).__init__(relation)
         self.init_keystone_client()
-        self.uconfig = config()
+        self.uconfig = hookenv.config()
 
     def init_keystone_client(self):
         if self.kc:
@@ -46,10 +44,9 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
             'region_name': self.creds['service_region'],
         }
         try:
-            self.kc = keystoneclient.Client(**auth)
+            self.kc = keystoneclient.client.Client(**auth)
         except:
-            log("Keystone does not appear to be ready, deferring keystone "
-                "query")
+            hookenv.log("Keystone is not ready, deferring keystone query")
 
     @property
     def ec2_creds(self):
@@ -79,7 +76,7 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
                 if self.uconfig.get('glance-alt-image-name') == image.name:
                     image_info['image_alt_id'] = image.id
         except:
-            log("Glance does not appear to be ready, deferring glance query")
+            hookenv.log("Glance is not ready, deferring glance query")
         return image_info
 
     @property
@@ -96,19 +93,19 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
             routers = neutron_client.list_routers(
                 name=self.uconfig['router-name'])
             if len(routers['routers']) == 0:
-                log("Router not found")
+                hookenv.log("Router not found")
             else:
                 router = routers['routers'][0]
                 network_info['router_id'] = router['id']
             networks = neutron_client.list_networks(
                 name=self.uconfig['network-name'])
             if len(networks['networks']) == 0:
-                log("network not found")
+                hookenv.log("network not found")
             else:
                 network = networks['networks'][0]
                 network_info['public_network_id'] = network['id']
         except:
-            log("Neutron does not appear to be ready, deferring neutron query")
+            hookenv.log("Neutron is not ready, deferring neutron query")
         return network_info
 
     @property
@@ -120,12 +117,11 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
         )
         compute_info = {}
         compute_info['nova_endpoint'] = nova_ep
-        url = urlparse(nova_ep)
+        url = urllib.parse.urlparse(nova_ep)
         compute_info['nova_base'] = '{}://{}'.format(url.scheme,
                                                      url.netloc.split(':')[0])
         try:
-            nova_client = novaclient.Client(
-                2,
+            nova_client = novaclient.client.Client(
                 self.creds['service_username'],
                 self.creds['service_password'],
                 self.creds['service_tenant_name'],
@@ -137,7 +133,7 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
                 if self.uconfig['flavor-alt-name'] == flavor.name:
                     compute_info['flavor_alt_id'] = flavor.id
         except:
-            log("Nova does not appear to be ready, deferring nova query")
+            hookenv.log("Nova is not ready, deferring nova query")
         return compute_info
 
     @property
@@ -165,7 +161,7 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
         present_svcs = self.get_present_services()
         # If not running in an action context asssume auto mode
         try:
-            action_args = action_get()
+            action_args = hookenv.action_get()
         except:
             action_args = {'service-whitelist': 'auto'}
         if action_args['service-whitelist'] == 'auto':
@@ -183,7 +179,7 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
         return service_info
 
 
-class TempestAdapters(OpenStackRelationAdapters):
+class TempestAdapters(adapters.OpenStackRelationAdapters):
     """
     Adapters class for the Designate charm.
     """
@@ -197,13 +193,13 @@ class TempestAdapters(OpenStackRelationAdapters):
             options=TempestConfigurationAdapter)
 
 
-class TempestConfigurationAdapter(ConfigurationAdapter):
+class TempestConfigurationAdapter(adapters.ConfigurationAdapter):
 
     def __init__(self):
         super(TempestConfigurationAdapter, self).__init__()
 
 
-class TempestCharm(OpenStackCharm):
+class TempestCharm(charm.OpenStackCharm):
 
     TEMPEST_ROOT = '/var/lib/tempest/'
     TEMPEST_LOGDIR = TEMPEST_ROOT + '/logs'
@@ -231,7 +227,7 @@ class TempestCharm(OpenStackCharm):
     }
 
 
-class TempestCharmFactory(OpenStackCharmFactory):
+class TempestCharmFactory(charm.OpenStackCharmFactory):
 
     releases = {
         'liberty': TempestCharm
