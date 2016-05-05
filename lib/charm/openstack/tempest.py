@@ -11,6 +11,14 @@ import glanceclient
 from neutronclient.v2_0 import client as neutronclient
 from novaclient import client as novaclient
 
+charm = None
+
+
+def get_charm():
+    global charm
+    if charm is None:
+        charm = TempestCharmFactory.charm()
+    return charm
 
 class TempestAdminAdapter(OpenStackRelationAdapter):
 
