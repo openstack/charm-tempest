@@ -1,12 +1,16 @@
 from urllib.parse import urlparse
-from charm.openstack.ip import PUBLIC, INTERNAL, ADMIN
 from charm.openstack.charm import OpenStackCharmFactory, OpenStackCharm
-from charm.openstack.adapters import OpenStackRelationAdapters, OpenStackRelationAdapter, ConfigurationAdapter
-from charmhelpers.core.hookenv import log, config
+from charm.openstack.adapters import (
+    OpenStackRelationAdapters,
+    OpenStackRelationAdapter,
+    ConfigurationAdapter,
+)
+from charmhelpers.core.hookenv import log, config, action_get
 from keystoneclient.v2_0 import client as keystoneclient
 import glanceclient
 from neutronclient.v2_0 import client as neutronclient
 from novaclient import client as novaclient
+
 
 class TempestAdminAdapter(OpenStackRelationAdapter):
 
@@ -170,6 +174,7 @@ class TempestAdminAdapter(OpenStackRelationAdapter):
                 service_info[svc] = 'false'
         return service_info
 
+
 class TempestAdapters(OpenStackRelationAdapters):
     """
     Adapters class for the Designate charm.
@@ -183,14 +188,11 @@ class TempestAdapters(OpenStackRelationAdapters):
             relations,
             options=TempestConfigurationAdapter)
 
+
 class TempestConfigurationAdapter(ConfigurationAdapter):
 
     def __init__(self):
         super(TempestConfigurationAdapter, self).__init__()
-
-    @property
-    def nova_base(self):
-        return 'bob'
 
 
 class TempestCharm(OpenStackCharm):
@@ -208,10 +210,10 @@ class TempestCharm(OpenStackCharm):
         'python-keystoneclient', 'python-neutronclient', 'python-novaclient',
         'python-swiftclient', 'python-ceilometerclient', 'openvswitch-test',
         'python3-cinderclient', 'python3-glanceclient', 'python3-heatclient',
-        'python3-keystoneclient', 'python3-neutronclient', 'python3-novaclient',
-        'python3-swiftclient', 'python3-ceilometerclient',
-        'openvswitch-common', 'libffi-dev', 'libssl-dev', 'python-dev',
-        'python-cffi', 'tox'
+        'python3-keystoneclient', 'python3-neutronclient',
+        'python3-novaclient', 'python3-swiftclient',
+        'python3-ceilometerclient', 'openvswitch-common', 'libffi-dev',
+        'libssl-dev', 'python-dev', 'python-cffi', 'tox'
     ]
 
     adapters_class = TempestAdapters
@@ -220,6 +222,7 @@ class TempestCharm(OpenStackCharm):
         PIP_CONF: [],
     }
 
+
 class TempestCharmFactory(OpenStackCharmFactory):
 
     releases = {
@@ -227,4 +230,3 @@ class TempestCharmFactory(OpenStackCharmFactory):
     }
 
     first_release = 'liberty'
-

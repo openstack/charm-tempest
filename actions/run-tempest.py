@@ -6,15 +6,14 @@ sys.path.append('lib')
 import os
 import subprocess
 from charmhelpers.core.hookenv import (
-    action_fail,
     action_set,
     config,
     action_get,
 )
 from time import gmtime, strftime
-from charms.reactive import is_state
 import charm.openstack.tempest as tempest
 from charmhelpers.fetch import install_remote
+
 
 def setup_git(branch, git_dir, tempest_conf):
     conf = config()
@@ -27,26 +26,36 @@ def setup_git(branch, git_dir, tempest_conf):
         os.symlink(tempest_conf, conf_symlink)
 
 
-def run_smoke_test():
-    conf = config()
-    action_args = action_get()
-    branch = action_args['branch']
-    tempest_git_dir = tempest.TempestCharm.TEMPEST_ROOT + '/tempest-{}'.format(branch)
-    run_dir = tempest_git_dir + '/tempest'
-    setup_git(branch, tempest_git_dir, tempest.TempestCharm.TEMPEST_CONF)
+def execute_tox(run_dir, logfile):
     env = os.environ.copy()
+    conf = config()
     if conf.get('http-proxy'):
         env['http_proxy'] = conf['http-proxy']
     if conf.get('https-proxy'):
         env['https_proxy'] = conf['https-proxy']
+    cmd = ['tox', '-e', 'smoke']
+    f = open(logfile, "w")
+    subprocess.call(cmd, cwd=run_dir, stdout=f, stderr=f)
+
+
+def run_smoke_test():
+    action_args = action_get()
+    branch = action_args['branch']
     log_time_str = strftime("%Y%m%d%H%M%S", gmtime())
-    tempest_logfile = tempest.TempestCharm.TEMPEST_LOGDIR + '/run_{}.log'.format(log_time_str)
+    tempest_git_dir = '{}/tempest-{}'.format(
+        tempest.TempestCharm.TEMPEST_ROOT,
+        branch
+    )
+    tempest_logfile = '{}/run_{}.log'.format(
+        tempest.TempestCharm.TEMPEST_LOGDIR,
+        log_time_str
+    )
     action_info = {
         'tempest-logfile': tempest_logfile,
     }
-    cmd = ['tox', '-e', 'smoke']
-    f = open(tempest_logfile, "w")
-    subprocess.call(cmd, cwd=run_dir, stdout=f, stderr=f)
+    run_dir = tempest_git_dir + '/tempest'
+    setup_git(branch, tempest_git_dir, tempest.TempestCharm.TEMPEST_CONF)
+    execute_tox(run_dir, tempest_logfile)
     action_set(action_info)
 
 
