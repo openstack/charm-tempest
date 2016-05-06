@@ -12,6 +12,9 @@ tempest_charm = None
 
 
 def get_charm():
+    """ Return a new instance of TempestCharm or existing global instance
+    @returns TempestCharm
+    """
     global tempest_charm
     if tempest_charm is None:
         tempest_charm = TempestCharmFactory.charm()
@@ -20,28 +23,38 @@ def get_charm():
 
 class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
+    """Inspect relations and provide properties that can be used when
+       rendering templates"""
+
     interface_type = "identity-admin"
 
     def __init__(self, relation):
+        """Initialise a keystone client and collect user defined config"""
         self.kc = None
         super(TempestAdminAdapter, self).__init__(relation)
         self.init_keystone_client()
         self.uconfig = hookenv.config()
 
+    @property
+    def keystone_info(self):
+        """Collection keystone information from keystone relation"""
+        return self.relation.credentials()
+
     def init_keystone_client(self):
+        """Initialise keystone client"""
         if self.kc:
             return
         self.keystone_auth_url = '{}://{}:{}/v2.0'.format(
             'http',
-            self.creds['service_hostname'],
-            self.creds['service_port']
+            self.keystone_info['service_hostname'],
+            self.keystone_info['service_port']
         )
         auth = {
-            'username': self.creds['service_username'],
-            'password': self.creds['service_password'],
+            'username': self.keystone_info['service_username'],
+            'password': self.keystone_info['service_password'],
             'auth_url': self.keystone_auth_url,
-            'tenant_name': self.creds['service_tenant_name'],
-            'region_name': self.creds['service_region'],
+            'tenant_name': self.keystone_info['service_tenant_name'],
+            'region_name': self.keystone_info['service_region'],
         }
         try:
             self.kc = keystoneclient.client.Client(**auth)
@@ -50,6 +63,10 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
     @property
     def ec2_creds(self):
+        """Generate EC2 style tokens or return existing EC2 tokens
+
+        @returns {'access_token' token1, 'secret_token': token2}
+        """
         self.init_keystone_client()
         if not self.kc:
             return {}
@@ -62,6 +79,10 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
     @property
     def image_info(self):
+        """Return image ids for the user-defined image names
+
+        @returns {'image_id' id1, 'image_alt_id': id2}
+        """
         self.init_keystone_client()
         glance_endpoint = self.kc.service_catalog.url_for(
             service_type='image',
@@ -81,6 +102,11 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
     @property
     def network_info(self):
+        """Return public network and router ids for user-defined router and
+           network names
+
+        @returns {'image_id' id1, 'image_alt_id': id2}
+        """
         self.init_keystone_client()
         neutron_ep = self.kc.service_catalog.url_for(
             service_type='network',
@@ -110,6 +136,10 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
     @property
     def compute_info(self):
+        """Return flavor ids for user-defined flavors
+
+        @returns {'flavor_id' id1, 'flavor_alt_id': id2}
+        """
         self.init_keystone_client()
         nova_ep = self.kc.service_catalog.url_for(
             service_type='compute',
@@ -122,9 +152,9 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
                                                      url.netloc.split(':')[0])
         try:
             nova_client = novaclient.client.Client(
-                self.creds['service_username'],
-                self.creds['service_password'],
-                self.creds['service_tenant_name'],
+                self.keystone_info['service_username'],
+                self.keystone_info['service_password'],
+                self.keystone_info['service_tenant_name'],
                 self.keystone_auth_url,
             )
             for flavor in nova_client.flavors.list():
@@ -136,24 +166,26 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
             hookenv.log("Nova is not ready, deferring nova query")
         return compute_info
 
-    @property
-    def creds(self):
-        return self.relation.credentials()
-
-    @property
-    def auth_url(self):
-        bob = self.get_keystone_client() or 'bugger'
-        return bob
 
     def get_present_services(self):
+        """Query keystone catalogue for a list for registered services
+
+        @returns [svc1, svc2, ...]: List of registered services
+        """
         self.init_keystone_client()
         services = [svc.name for svc in self.kc.services.list() if svc.enabled]
-#        if DashboardRelation().get('dashboard_url'):
-#            services.append('horizon')
         return services
 
     @property
     def service_info(self):
+        """Assemble a list of services tempest should tests
+
+        Compare the list of keystone registered services with the services the
+        user has requested be tested. If in 'auto' mode test all services
+        registered in keystone.
+        
+        @returns [svc1, svc2, ...]: List of services to test
+        """
         service_info = {}
         tempest_candidates = ['ceilometer', 'cinder', 'glance', 'heat',
                               'horizon', 'ironic', 'neutron', 'nova',
@@ -181,7 +213,7 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
 class TempestAdapters(adapters.OpenStackRelationAdapters):
     """
-    Adapters class for the Designate charm.
+    Adapters class for the Tempest charm.
     """
     relation_adapters = {
         'identity_admin': TempestAdminAdapter,
@@ -194,18 +226,26 @@ class TempestAdapters(adapters.OpenStackRelationAdapters):
 
 
 class TempestConfigurationAdapter(adapters.ConfigurationAdapter):
-
+    """
+    Manipulate user supplied config as needed
+    """
     def __init__(self):
         super(TempestConfigurationAdapter, self).__init__()
 
 
 class TempestCharm(charm.OpenStackCharm):
 
+    """Directories and files used for running tempest"""
     TEMPEST_ROOT = '/var/lib/tempest/'
     TEMPEST_LOGDIR = TEMPEST_ROOT + '/logs'
     TEMPEST_CONF = TEMPEST_ROOT + '/tempest.conf'
+    """pip.conf for proxy settings etc"""
     PIP_CONF = '/root/.pip/pip.conf'
 
+    """List of packages charm should install
+       XXX The install hook is currently installing most packages ahead of
+           this because modules like keystoneclient are needed at load time
+    """
     packages = [
         'git', 'testrepository', 'subunit', 'python-nose', 'python-lxml',
         'python-boto', 'python-junitxml', 'python-subunit',
@@ -217,10 +257,14 @@ class TempestCharm(charm.OpenStackCharm):
         'python3-keystoneclient', 'python3-neutronclient',
         'python3-novaclient', 'python3-swiftclient',
         'python3-ceilometerclient', 'openvswitch-common', 'libffi-dev',
-        'libssl-dev', 'python-dev', 'python-cffi', 'tox'
+        'libssl-dev', 'python-dev', 'python-cffi'
     ]
 
+    """Use the Tempest specific adapters"""
     adapters_class = TempestAdapters
+    """Tempest has no running services so no services need restarting on
+       config file change
+    """
     restart_map = {
         TEMPEST_CONF: [],
         PIP_CONF: [],
