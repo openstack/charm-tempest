@@ -10,13 +10,16 @@ check_and_install() {
 }
 
 if [[ $(lsb_release -sc) -eq "trusty" ]]; then
+    juju-log "Enabling cloud archive to work around old trusty tools"
     # Add a random cloud archive for the Openstack python3 clients
     add-apt-repository --yes ppa:ubuntu-cloud-archive/mitaka-staging
     apt-get update
+    check_and_install 'python3-pip'
     # The trusty version of tox is too low (tox version is 1.6, required is at least 2.3.1)
     # pip install tox to get around this and die a little inside
-    pip install tox
+    pip3 install tox
 else
+    juju-log "Installing tox"
     check_and_install 'tox'
 fi
 
