@@ -1,3 +1,7 @@
+import os
+import subprocess
+import time
+
 import glanceclient
 import keystoneclient.v2_0 as keystoneclient
 import neutronclient.v2_0.client as neutronclient
@@ -7,6 +11,7 @@ import urllib
 import charm.openstack.charm as charm
 import charm.openstack.adapters as adapters
 import charmhelpers.core.hookenv as hookenv
+import charmhelpers.fetch as fetch
 
 tempest_charm = None
 
@@ -166,7 +171,6 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
             hookenv.log("Nova is not ready, deferring nova query")
         return compute_info
 
-
     def get_present_services(self):
         """Query keystone catalogue for a list for registered services
 
@@ -183,7 +187,7 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         Compare the list of keystone registered services with the services the
         user has requested be tested. If in 'auto' mode test all services
         registered in keystone.
-        
+
         @returns [svc1, svc2, ...]: List of services to test
         """
         service_info = {}
@@ -269,6 +273,52 @@ class TempestCharm(charm.OpenStackCharm):
         TEMPEST_CONF: [],
         PIP_CONF: [],
     }
+
+    def setup_git(self, branch, git_dir):
+        """Clone tempest and symlink in rendered tempest.conf"""
+        conf = hookenv.config()
+        if not os.path.exists(git_dir):
+            git_url = conf['tempest-source']
+            fetch.install_remote(str(git_url), dest=str(git_dir),
+                                 branch=str(branch), depth=str(1))
+        conf_symlink = git_dir + '/tempest/etc/tempest.conf'
+        if not os.path.exists(conf_symlink):
+            os.symlink(self.TEMPEST_CONF, conf_symlink)
+
+    def execute_tox(self, run_dir, logfile, tox_target):
+        """Trigger tempest run through tox setting proxies if needed"""
+        env = os.environ.copy()
+        conf = hookenv.config()
+        if conf.get('http-proxy'):
+            env['http_proxy'] = conf['http-proxy']
+        if conf.get('https-proxy'):
+            env['https_proxy'] = conf['https-proxy']
+        cmd = ['tox', '-e', tox_target]
+        f = open(logfile, "w")
+        subprocess.call(cmd, cwd=run_dir, stdout=f, stderr=f)
+
+    def get_tempest_files(self, branch_name):
+        """Prepare tempets files and directories
+
+        @return git_dir, logfile, run_dir
+        """
+        log_time_str = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+        git_dir = '{}/tempest-{}'.format(self.TEMPEST_ROOT, branch_name)
+        logfile = '{}/run_{}.log'.format(self.TEMPEST_LOGDIR, log_time_str)
+        run_dir = '{}/tempest'.format(git_dir)
+        return git_dir, logfile, run_dir
+
+    def run_test(self, tox_target):
+        """Run smoke tests"""
+        action_args = hookenv.action_get()
+        branch_name = action_args['branch']
+        git_dir, logfile, run_dir = self.get_tempest_files(branch_name)
+        action_info = {
+            'tempest-logfile': logfile,
+        }
+        self.setup_git(branch_name, git_dir)
+        self.execute_tox(run_dir, logfile, tox_target)
+        hookenv.action_set(action_info)
 
 
 class TempestCharmFactory(charm.OpenStackCharmFactory):
