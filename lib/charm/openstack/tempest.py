@@ -13,6 +13,8 @@ import charm.openstack.adapters as adapters
 import charmhelpers.core.hookenv as hookenv
 import charmhelpers.fetch as fetch
 
+from charmhelpers.core.host import mkdir
+
 tempest_charm = None
 
 
@@ -298,11 +300,12 @@ class TempestCharm(charm.OpenStackCharm):
         subprocess.call(cmd, cwd=run_dir, stdout=f, stderr=f)
 
     def get_tempest_files(self, branch_name):
-        """Prepare tempets files and directories
+        """Prepare tempest files and directories
 
         @return git_dir, logfile, run_dir
         """
         log_time_str = time.strftime("%Y%m%d%H%M%S", time.gmtime())
+        mkdir(self.TEMPEST_LOGDIR)
         git_dir = '{}/tempest-{}'.format(self.TEMPEST_ROOT, branch_name)
         logfile = '{}/run_{}.log'.format(self.TEMPEST_LOGDIR, log_time_str)
         run_dir = '{}/tempest'.format(git_dir)
