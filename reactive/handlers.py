@@ -8,7 +8,7 @@ def install_packages():
     tempest.get_charm().install()
 
 
-@reactive.when('identity-admin.connected')
+@reactive.when('identity-admin.available')
 def render_tempest_config(keystone):
     charm = tempest.TempestCharmFactory.charm(
         interfaces=[keystone]
