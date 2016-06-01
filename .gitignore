@@ -1,3 +1,7 @@
-.tox
+bin
 build
+.coverage
+.testrepository
+.tox
+*.sw[nop]
 *.pyc
