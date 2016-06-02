@@ -8,6 +8,7 @@ The Tempest Charm can be deployed into a new or existing Juju model containing a
 # Building
 
 ```
+sudo apt-get install python-tox
 tox -e build
 ```
 
