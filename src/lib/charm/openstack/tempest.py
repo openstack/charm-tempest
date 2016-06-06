@@ -13,17 +13,21 @@ import charm.openstack.adapters as adapters
 import charmhelpers.core.hookenv as hookenv
 import charmhelpers.fetch as fetch
 
-tempest_charm = None
 
-
-def get_charm():
-    """ Return a new instance of TempestCharm or existing global instance
-    @returns TempestCharm
+def install():
+    """Use the singleton from the BarbicanCharm to install the packages on the
+    unit
     """
-    global tempest_charm
-    if tempest_charm is None:
-        tempest_charm = TempestCharmFactory.charm()
-    return tempest_charm
+    TempestCharm.singleton.install()
+
+
+def render_configs(interfaces_list):
+    """Using a list of interfaces, render the configs and, if they have
+    changes, restart the services on the unit.
+    """
+    if not os.path.isdir(TempestCharm.TEMPEST_LOGDIR):
+        os.makedirs(TempestCharm.TEMPEST_LOGDIR)
+    TempestCharm.singleton.render_with_interfaces(interfaces_list)
 
 
 class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
@@ -240,6 +244,9 @@ class TempestConfigurationAdapter(adapters.ConfigurationAdapter):
 
 class TempestCharm(charm.OpenStackCharm):
 
+    release = 'liberty'
+    name = 'tempest'
+
     """Directories and files used for running tempest"""
     TEMPEST_ROOT = '/var/lib/tempest/'
     TEMPEST_LOGDIR = TEMPEST_ROOT + '/logs'
@@ -326,12 +333,3 @@ class TempestCharm(charm.OpenStackCharm):
         self.setup_git(branch_name, git_dir)
         self.execute_tox(run_dir, logfile, tox_target)
         hookenv.action_set(action_info)
-
-
-class TempestCharmFactory(charm.OpenStackCharmFactory):
-
-    releases = {
-        'liberty': TempestCharm
-    }
-
-    first_release = 'liberty'
