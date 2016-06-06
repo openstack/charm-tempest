@@ -1,18 +1,13 @@
 import charms.reactive as reactive
 import charm.openstack.tempest as tempest
-import os
 
 
-@reactive.hook('install')
+@reactive.when_not('charm.installed')
 def install_packages():
-    tempest.get_charm().install()
+    tempest.install()
+    reactive.set_state('charm.installed')
 
 
 @reactive.when('identity-admin.available')
 def render_tempest_config(keystone):
-    charm = tempest.TempestCharmFactory.charm(
-        interfaces=[keystone]
-    )
-    if not os.path.isdir(charm.TEMPEST_LOGDIR):
-        os.makedirs(charm.TEMPEST_LOGDIR)
-    charm.render_all_configs()
+    tempest.render_configs([keystone])
