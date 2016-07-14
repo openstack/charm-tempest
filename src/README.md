@@ -7,7 +7,9 @@ The Tempest Charm can be deployed into a new or existing Juju model containing a
 
 # Usage
 
-At this time, the Tempest charm is in development and is in a proof-of-concept state.  Development and related discussion occurs on the freenode #juju irc channel.
+NOTICE: At this time, the Tempest charm is in development and is in a proof-of-concept alpha state.
+
+Development and related discussion occurs on the freenode #openstack-charms irc channel.
 
 TLDR:  Deploy the built charm and relate it to keystone and openstack-dashboard.  See config.yaml as annotated.
 
@@ -16,6 +18,6 @@ More docs to come as this matures.
 
 # Contact Information
 
-Report bugs on [Launchpad](http://bugs.launchpad.net/charms/+source/tempest/+filebug)
+See the [OpenStack Charm Guide](http://docs.openstack.org/developer/charm-guide/) or discuss on Freenode IRC: #openstack-charms
 
-Freenode IRC: #openstack-charms
+
