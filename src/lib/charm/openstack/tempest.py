@@ -15,7 +15,7 @@ import charmhelpers.fetch as fetch
 
 
 def install():
-    """Use the singleton from the BarbicanCharm to install the packages on the
+    """Use the singleton from the TempestCharm to install the packages on the
     unit
     """
     TempestCharm.singleton.install()
@@ -28,6 +28,14 @@ def render_configs(interfaces_list):
     if not os.path.isdir(TempestCharm.TEMPEST_LOGDIR):
         os.makedirs(TempestCharm.TEMPEST_LOGDIR)
     TempestCharm.singleton.render_with_interfaces(interfaces_list)
+    TempestCharm.singleton.assess_status()
+
+
+def run_test(tox_target):
+    """Use the singleton from the TempestCharm to install the packages on the
+    unit
+    """
+    TempestCharm.singleton.run_test(tox_target)
 
 
 class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
@@ -247,6 +255,7 @@ class TempestCharm(charm.OpenStackCharm):
     release = 'liberty'
     name = 'tempest'
 
+    required_relations = ['identity-admin']
     """Directories and files used for running tempest"""
     TEMPEST_ROOT = '/var/lib/tempest/'
     TEMPEST_LOGDIR = TEMPEST_ROOT + '/logs'

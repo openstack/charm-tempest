@@ -10,5 +10,4 @@ if __name__ == '__main__':
     # Cloud may have different artifacts (flavors, images etc) since last run
     # so rerun handlers file to regenerate config.
     reactive.main()
-    charm = tempest.get_charm()
-    charm.run_test('smoke')
+    tempest.run_test('smoke')
