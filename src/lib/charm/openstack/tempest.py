@@ -1,3 +1,4 @@
+import re
 import os
 import subprocess
 import time
@@ -257,7 +258,7 @@ class TempestCharm(charm.OpenStackCharm):
 
     required_relations = ['identity-admin']
     """Directories and files used for running tempest"""
-    TEMPEST_ROOT = '/var/lib/tempest/'
+    TEMPEST_ROOT = '/var/lib/tempest'
     TEMPEST_LOGDIR = TEMPEST_ROOT + '/logs'
     TEMPEST_CONF = TEMPEST_ROOT + '/tempest.conf'
     """pip.conf for proxy settings etc"""
@@ -330,15 +331,37 @@ class TempestCharm(charm.OpenStackCharm):
         run_dir = '{}/tempest'.format(git_dir)
         return git_dir, logfile, run_dir
 
+    def parse_tempest_log(self, logfile):
+        """Read tempest logfile and return summary as dict
+
+        @return dict: Dictonary of summary data
+        """
+        summary = {}
+        with open(logfile) as tempest_log:
+            summary_line = False
+            for line in tempest_log:
+                if line.strip() == "Totals":
+                    summary_line = True
+                if line.strip() == "Worker Balance":
+                    summary_line = False
+                if summary_line:
+                    # Match lines like: ' - Unexpected Success: 0'
+                    matchObj = re.match(
+                        r'(.*)- (.*?):\s+(.*)', line, re.M | re.I)
+                    if matchObj:
+                        key = matchObj.group(2)
+                        key = key.replace(' ', '-').replace(':', '').lower()
+                        summary[key] = matchObj.group(3)
+        return summary
+
     def run_test(self, tox_target):
         """Run smoke tests"""
         action_args = hookenv.action_get()
         branch_name = action_args['branch']
         git_dir, logfile, run_dir = self.get_tempest_files(branch_name)
-        action_info = {
-            'tempest-logfile': logfile,
-        }
         self.setup_directories()
         self.setup_git(branch_name, git_dir)
         self.execute_tox(run_dir, logfile, tox_target)
+        action_info = self.parse_tempest_log(logfile)
+        action_info['tempest-logfile'] = logfile
         hookenv.action_set(action_info)
