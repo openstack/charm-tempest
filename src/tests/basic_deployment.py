@@ -28,9 +28,10 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
         self._deploy()
 
         u.log.info('Waiting on extended status checks...')
-        exclude_services = ['mysql', 'mongodb']
+        exclude_services = []
         self._auto_wait_for_status(exclude_services=exclude_services)
 
+        self.d.sentry.wait()
         self._initialize_tests()
 
     def _add_services(self):
@@ -41,11 +42,13 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
            compatible with the local charm (e.g. stable or next).
            """
         this_service = {'name': 'tempest'}
-        other_services = [{'name': 'mysql'},
-                          {'name': 'rabbitmq-server'},
-                          {'name': 'keystone'},
-                          {'name': 'openstack-dashboard'},
-                          {'name': 'glance'}]
+        other_services = [
+            {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
+            {'name': 'rabbitmq-server'},
+            {'name': 'keystone'},
+            {'name': 'openstack-dashboard'},
+            {'name': 'glance'}
+        ]
         super(TempestBasicDeployment, self)._add_services(
             this_service,
             other_services,
@@ -58,9 +61,9 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
             'tempest:dashboard': 'openstack-dashboard:website',
             'openstack-dashboard:identity-service':
             'keystone:identity-service',
-            'keystone:shared-db': 'mysql:shared-db',
+            'keystone:shared-db': 'percona-cluster:shared-db',
             'glance:identity-service': 'keystone:identity-service',
-            'glance:shared-db': 'mysql:shared-db',
+            'glance:shared-db': 'percona-cluster:shared-db',
             'glance:amqp': 'rabbitmq-server:amqp'
         }
         super(TempestBasicDeployment, self)._add_relations(relations)
@@ -69,7 +72,16 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
         """Configure all of the services."""
         keystone_config = {'admin-password': 'openstack',
                            'admin-token': 'ubuntutesting'}
-        configs = {'keystone': keystone_config}
+        pxc_config = {
+            'dataset-size': '25%',
+            'max-connections': 1000,
+            'root-password': 'ChangeMe123',
+            'sst-password': 'ChangeMe123',
+        }
+        configs = {
+            'keystone': keystone_config,
+            'percona-cluster': pxc_config,
+        }
         super(TempestBasicDeployment, self)._configure_services(configs)
 
     def _get_token(self):
@@ -78,9 +90,6 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
     def _initialize_tests(self):
         """Perform final initialization before tests get run."""
         # Access the sentries for inspecting service units
-        self.mysql_sentry = self.d.sentry['mysql'][0]
-        self.keystone_sentry = self.d.sentry['keystone'][0]
-        self.rabbitmq_sentry = self.d.sentry['rabbitmq-server'][0]
         self.tempest_sentry = self.d.sentry['tempest'][0]
         self.openstack_dashboard_sentry = \
             self.d.sentry['openstack-dashboard'][0]
