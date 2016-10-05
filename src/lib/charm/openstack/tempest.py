@@ -123,7 +123,7 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         """Return public network and router ids for user-defined router and
            network names
 
-        @returns {'image_id' id1, 'image_alt_id': id2}
+        @returns {'public_network_id' id1, 'router_id': id2}
         """
         self.init_keystone_client()
         network_info = {}
