@@ -15,6 +15,9 @@ TLDR:  Deploy the built charm and relate it to keystone and openstack-dashboard.
 
 More docs to come as this matures.
 
+Executing the run-tempest action:
+
+juju run-action tempest/0 run-tempest
 
 # Contact Information
 

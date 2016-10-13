@@ -7,7 +7,6 @@ import charms.reactive as reactive
 
 
 if __name__ == '__main__':
-    # Cloud may have different artifacts (flavors, images etc) since last run
-    # so rerun handlers file to regenerate config.
-    reactive.main()
+    identity_int = reactive.RelationBase.from_state('identity-admin.available')
+    tempest.render_configs([identity_int])
     tempest.run_test('smoke')

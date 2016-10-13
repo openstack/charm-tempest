@@ -1,6 +1,8 @@
 import charms.reactive as reactive
 import charm.openstack.tempest as tempest
 
+# config is rendered when the run tempest action is called
+
 
 @reactive.when_not('charm.installed')
 def install_packages():
@@ -8,6 +10,6 @@ def install_packages():
     reactive.set_state('charm.installed')
 
 
-@reactive.when('identity-admin.available')
-def render_tempest_config(keystone):
-    tempest.render_configs([keystone])
+@reactive.when('charm.installed')
+def assess_status():
+    tempest.assess_status()

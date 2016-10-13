@@ -39,6 +39,13 @@ def run_test(tox_target):
     TempestCharm.singleton.run_test(tox_target)
 
 
+def assess_status():
+    """Use the singleton from the TempestCharm to install the packages on the
+    unit
+    """
+    TempestCharm.singleton.assess_status()
+
+
 class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
     """Inspect relations and provide properties that can be used when
