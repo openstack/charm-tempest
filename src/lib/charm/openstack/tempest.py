@@ -65,15 +65,24 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         """Collection keystone information from keystone relation"""
         return self.relation.credentials()
 
-    def init_keystone_client(self):
-        """Initialise keystone client"""
-        if self.kc:
-            return
-        self.keystone_auth_url = '{}://{}:{}/v2.0'.format(
+    @property
+    def ks_client(self):
+        if not self.kc:
+            self.init_keystone_client()
+        return self.kc
+
+    @property
+    def keystone_auth_url(self):
+        return '{}://{}:{}/v2.0'.format(
             'http',
             self.keystone_info['service_hostname'],
             self.keystone_info['service_port']
         )
+
+    def init_keystone_client(self):
+        """Initialise keystone client"""
+        if self.kc:
+            return
         auth = {
             'username': self.keystone_info['service_username'],
             'password': self.keystone_info['service_password'],
@@ -92,14 +101,15 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
         @returns {'access_token' token1, 'secret_token': token2}
         """
-        self.init_keystone_client()
-        if not self.kc:
+        if not self.ks_client:
             return {}
-        current_creds = self.kc.ec2.list(self.kc.user_id)
+        current_creds = self.ks_client.ec2.list(self.ks_client.user_id)
         if current_creds:
             creds = current_creds[0]
         else:
-            creds = self.kc.ec2.create(self.kc.user_id, self.kc.tenant_id)
+            creds = self.ks_client.ec2.create(
+                self.ks_client.user_id,
+                self.ks_client.tenant_id)
         return {'access_token': creds.access, 'secret_token': creds.secret}
 
     @property
@@ -108,14 +118,13 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
         @returns {'image_id' id1, 'image_alt_id': id2}
         """
-        self.init_keystone_client()
         image_info = {}
         try:
-            glance_endpoint = self.kc.service_catalog.url_for(
+            glance_endpoint = self.ks_client.service_catalog.url_for(
                 service_type='image',
                 endpoint_type='publicURL')
             glance_client = glanceclient.Client(
-                '2', glance_endpoint, token=self.kc.auth_token)
+                '2', glance_endpoint, token=self.ks_client.auth_token)
             for image in glance_client.images.list():
                 if self.uconfig.get('glance-image-name') == image.name:
                     image_info['image_id'] = image.id
@@ -138,15 +147,14 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
         @returns {'public_network_id' id1, 'router_id': id2}
         """
-        self.init_keystone_client()
         network_info = {}
         try:
-            neutron_ep = self.kc.service_catalog.url_for(
+            neutron_ep = self.ks_client.service_catalog.url_for(
                 service_type='network',
                 endpoint_type='publicURL')
             neutron_client = neutronclient.Client(
                 endpoint_url=neutron_ep,
-                token=self.kc.auth_token)
+                token=self.ks_client.auth_token)
             routers = neutron_client.list_routers(
                 name=self.uconfig['router-name'])
             if len(routers['routers']) == 0:
@@ -178,10 +186,9 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
         @returns {'flavor_id' id1, 'flavor_alt_id': id2}
         """
-        self.init_keystone_client()
         compute_info = {}
         try:
-            nova_ep = self.kc.service_catalog.url_for(
+            nova_ep = self.ks_client.service_catalog.url_for(
                 service_type='compute',
                 endpoint_type='publicURL'
             )
@@ -210,8 +217,9 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
         @returns [svc1, svc2, ...]: List of registered services
         """
-        self.init_keystone_client()
-        services = [svc.name for svc in self.kc.services.list() if svc.enabled]
+        services = [svc.name
+                    for svc in self.ks_client.services.list()
+                    if svc.enabled]
         return services
 
     @property
@@ -338,7 +346,7 @@ class TempestCharm(charm.OpenStackCharm):
             env['https_proxy'] = conf['https-proxy']
         cmd = ['tox', '-e', tox_target]
         f = open(logfile, "w")
-        subprocess.call(cmd, cwd=run_dir, stdout=f, stderr=f)
+        subprocess.call(cmd, cwd=run_dir, stdout=f, stderr=f, env=env)
 
     def get_tempest_files(self, branch_name):
         """Prepare tempest files and directories
@@ -357,7 +365,7 @@ class TempestCharm(charm.OpenStackCharm):
         @return dict: Dictonary of summary data
         """
         summary = {}
-        with open(logfile) as tempest_log:
+        with open(logfile, 'r') as tempest_log:
             summary_line = False
             for line in tempest_log:
                 if line.strip() == "Totals":
