@@ -8,6 +8,11 @@ description: |
   deployment.
 tags:
   - openstack
+series:
+  - xenial
+  - yakkety
+  - trusty
+  - precise
 subordinate: false
 requires:
   identity-admin:
