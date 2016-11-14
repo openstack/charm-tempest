@@ -119,8 +119,14 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
             for image in glance_client.images.list():
                 if self.uconfig.get('glance-image-name') == image.name:
                     image_info['image_id'] = image.id
+                if self.uconfig.get('image-ssh-user'):
+                    image_info['image_ssh_user'] = \
+                        self.uconfig.get('image-ssh-user')
                 if self.uconfig.get('glance-alt-image-name') == image.name:
                     image_info['image_alt_id'] = image.id
+                if self.uconfig.get('image-alt-ssh-user'):
+                    image_info['image_alt_ssh_user'] = \
+                        self.uconfig.get('image-alt-ssh-user')
         except:
             hookenv.log("Glance is not ready, deferring glance query")
         return image_info
