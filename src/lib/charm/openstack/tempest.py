@@ -161,6 +161,13 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
             else:
                 network = networks['networks'][0]
                 network_info['public_network_id'] = network['id']
+            networks = neutron_client.list_networks(
+                name=self.uconfig['floating-network-name'])
+            if len(networks['networks']) == 0:
+                hookenv.log("Floating network name not found")
+            else:
+                network_info['floating-network-name'] = \
+                    self.uconfig['floating-network-name']
         except:
             hookenv.log("Neutron is not ready, deferring neutron query")
         return network_info

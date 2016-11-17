@@ -39,6 +39,10 @@ options:
     type: string
     default: "ext_net"
     description: "neutron network"
+  floating-network-name:
+    type: string
+    default: "ext-net"
+    description: "floating IP network"
   swift-resource-ip:
     type: string
     default:
