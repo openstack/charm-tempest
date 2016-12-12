@@ -12,6 +12,7 @@ import urllib
 import charms_openstack.charm as charm
 import charms_openstack.adapters as adapters
 import charmhelpers.core.hookenv as hookenv
+import charmhelpers.core.host as host
 import charmhelpers.fetch as fetch
 
 
@@ -319,6 +320,15 @@ class TempestCharm(charm.OpenStackCharm):
         TEMPEST_CONF: [],
         PIP_CONF: [],
     }
+
+    @property
+    def all_packages(self):
+        _packages = self.packages[:]
+        if host.lsb_release()['DISTRIB_RELEASE'] > '14.04':
+            _packages.append('tox')
+        else:
+            _packages.append('python-tox')
+        return _packages
 
     def setup_directories(self):
         for tempest_dir in [self.TEMPEST_ROOT, self.TEMPEST_LOGDIR]:

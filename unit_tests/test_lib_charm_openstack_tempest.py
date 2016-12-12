@@ -252,6 +252,18 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
 
 class TestTempestCharm(Helper):
 
+    def test_check_tox_installed_trusty(self):
+        # Test for Bug #1648493
+        self.patch_object(tempest.host, 'lsb_release')
+        self.lsb_release.return_value = {'DISTRIB_RELEASE': '14.04'}
+        self.assertTrue('python-tox' in tempest.TempestCharm().all_packages)
+
+    def test_check_tox_installed_xenial(self):
+        # Test for Bug #1648493
+        self.patch_object(tempest.host, 'lsb_release')
+        self.lsb_release.return_value = {'DISTRIB_RELEASE': '16.04'}
+        self.assertTrue('tox' in tempest.TempestCharm().all_packages)
+
     def test_setup_directories(self):
         self.patch_object(tempest.os.path, 'exists')
         self.patch_object(tempest.os, 'mkdir')
