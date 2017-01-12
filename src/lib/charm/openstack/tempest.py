@@ -1,13 +1,17 @@
-import re
 import os
+import re
 import subprocess
 import time
+import urllib
 
 import glanceclient
-import keystoneclient.v2_0 as keystoneclient
+import keystoneauth1
+import keystoneclient.v2_0.client as keystoneclient_v2
+import keystoneclient.v3.client as keystoneclient_v3
+import keystoneclient.auth.identity.v3 as keystone_id_v3
+import keystoneclient.session as session
 import neutronclient.v2_0.client as neutronclient
-import novaclient.v2 as novaclient
-import urllib
+import novaclient.client as novaclient_client
 
 import charms_openstack.charm as charm
 import charms_openstack.adapters as adapters
@@ -57,6 +61,8 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
     def __init__(self, relation):
         """Initialise a keystone client and collect user defined config"""
         self.kc = None
+        self.keystone_session = None
+        self.api_version = '2'
         super(TempestAdminAdapter, self).__init__(relation)
         self.init_keystone_client()
         self.uconfig = hookenv.config()
@@ -64,7 +70,16 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
     @property
     def keystone_info(self):
         """Collection keystone information from keystone relation"""
-        return self.relation.credentials()
+        ks_info = self.relation.credentials()
+        ks_info['default_credentials_domain_name'] = 'default'
+        if ks_info.get('api_version'):
+            ks_info['api_version'] = ks_info.get('api_version')
+        else:
+            ks_info['api_version'] = self.api_version
+        if not ks_info.get('service_user_domain_name'):
+            ks_info['service_user_domain_name'] = 'admin_domain'
+
+        return ks_info
 
     @property
     def ks_client(self):
@@ -72,29 +87,86 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
             self.init_keystone_client()
         return self.kc
 
-    @property
-    def keystone_auth_url(self):
-        return '{}://{}:{}/v2.0'.format(
+    def keystone_auth_url(self, api_version=None):
+        if not api_version:
+            api_version = self.keystone_info.get('api_version', '2')
+        ep_suffix = {
+            '2': 'v2.0',
+            '3': 'v3'}[api_version]
+        return '{}://{}:{}/{}'.format(
             'http',
             self.keystone_info['service_hostname'],
-            self.keystone_info['service_port']
+            self.keystone_info['service_port'],
+            ep_suffix,
         )
+
+    def resolve_endpoint(self, service_type, interface):
+        if self.api_version == '2':
+            ep = self.ks_client.service_catalog.url_for(
+                service_type=service_type,
+                endpoint_type='{}URL'.format(interface)
+            )
+        else:
+            svc_id = self.ks_client.services.find(type=service_type).id
+            ep = self.ks_client.endpoints.find(
+                service_id=svc_id,
+                interface=interface).url
+        return ep
+
+    def set_keystone_v2_client(self):
+        self.keystone_session = None
+        self.kc = keystoneclient_v2.Client(**self.admin_creds_v2)
+
+    def set_keystone_v3_client(self):
+        auth = keystone_id_v3.Password(**self.admin_creds_v3)
+        self.keystone_session = session.Session(auth=auth)
+        self.kc = keystoneclient_v3.Client(session=self.keystone_session)
 
     def init_keystone_client(self):
         """Initialise keystone client"""
         if self.kc:
             return
-        auth = {
+        if self.keystone_info.get('api_version', '2') > '2':
+            self.set_keystone_v3_client()
+            self.api_version = '3'
+        else:
+            # XXX Temporarily catching the Unauthorized exception to deal with
+            # the case (pre-17.02) where the keystone charm maybe in v3 mode
+            # without telling charms via the identity-admin relation
+            try:
+                self.set_keystone_v2_client()
+                self.api_version = '2'
+            except keystoneauth1.exceptions.http.Unauthorized:
+                self.set_keystone_v3_client()
+                self.api_version = '3'
+        self.kc.services.list()
+
+    def admin_creds_base(self, api_version):
+        return {
             'username': self.keystone_info['service_username'],
             'password': self.keystone_info['service_password'],
-            'auth_url': self.keystone_auth_url,
-            'tenant_name': self.keystone_info['service_tenant_name'],
-            'region_name': self.keystone_info['service_region'],
-        }
-        try:
-            self.kc = keystoneclient.client.Client(**auth)
-        except:
-            hookenv.log("Keystone is not ready, deferring keystone query")
+            'auth_url': self.keystone_auth_url(api_version=api_version)}
+
+    @property
+    def admin_creds_v2(self):
+            creds = self.admin_creds_base(api_version='2')
+            creds['tenant_name'] = self.keystone_info['service_tenant_name']
+            creds['region_name'] = self.keystone_info['service_region']
+            return creds
+
+    @property
+    def admin_creds_v3(self):
+            creds = self.admin_creds_base(api_version='3')
+            creds['project_name'] = self.keystone_info.get(
+                'service_project_name',
+                'admin')
+            creds['user_domain_name'] = self.keystone_info.get(
+                'service_user_domain_name',
+                'admin_domain')
+            creds['project_domain_name'] = self.keystone_info.get(
+                'service_project_domain_name',
+                'Default')
+            return creds
 
     @property
     def ec2_creds(self):
@@ -102,16 +174,19 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
 
         @returns {'access_token' token1, 'secret_token': token2}
         """
-        if not self.ks_client:
-            return {}
-        current_creds = self.ks_client.ec2.list(self.ks_client.user_id)
-        if current_creds:
-            creds = current_creds[0]
-        else:
-            creds = self.ks_client.ec2.create(
-                self.ks_client.user_id,
-                self.ks_client.tenant_id)
-        return {'access_token': creds.access, 'secret_token': creds.secret}
+        _ec2creds = {}
+        if self.api_version == '2':
+            current_creds = self.ks_client.ec2.list(self.ks_client.user_id)
+            if current_creds:
+                _ec2creds = current_creds[0]
+            else:
+                creds = self.ks_client.ec2.create(
+                    self.ks_client.user_id,
+                    self.ks_client.tenant_id)
+                _ec2creds = {
+                    'access_token': creds.access,
+                    'secret_token': creds.secret}
+        return _ec2creds
 
     @property
     def image_info(self):
@@ -120,12 +195,14 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         @returns {'image_id' id1, 'image_alt_id': id2}
         """
         image_info = {}
-        try:
-            glance_endpoint = self.ks_client.service_catalog.url_for(
-                service_type='image',
-                endpoint_type='publicURL')
-            glance_client = glanceclient.Client(
-                '2', glance_endpoint, token=self.ks_client.auth_token)
+        if self.service_present('glance'):
+            if self.keystone_session:
+                glance_client = glanceclient.Client(
+                    '2', session=self.keystone_session)
+            else:
+                glance_ep = self.resolve_endpoint('image', 'public')
+                glance_client = glanceclient.Client(
+                    '2', glance_ep, token=self.ks_client.auth_token)
             for image in glance_client.images.list():
                 if self.uconfig.get('glance-image-name') == image.name:
                     image_info['image_id'] = image.id
@@ -137,8 +214,6 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
                 if self.uconfig.get('image-alt-ssh-user'):
                     image_info['image_alt_ssh_user'] = \
                         self.uconfig.get('image-alt-ssh-user')
-        except:
-            hookenv.log("Glance is not ready, deferring glance query")
         return image_info
 
     @property
@@ -149,13 +224,17 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         @returns {'public_network_id' id1, 'router_id': id2}
         """
         network_info = {}
-        try:
-            neutron_ep = self.ks_client.service_catalog.url_for(
-                service_type='network',
-                endpoint_type='publicURL')
-            neutron_client = neutronclient.Client(
-                endpoint_url=neutron_ep,
-                token=self.ks_client.auth_token)
+        if self.service_present('neutron'):
+            if self.keystone_session:
+                neutron_client = neutronclient.Client(
+                    session=self.keystone_session)
+            else:
+                neutron_ep = self.ks_client.service_catalog.url_for(
+                    service_type='network',
+                    endpoint_type='publicURL')
+                neutron_client = neutronclient.Client(
+                    endpoint_url=neutron_ep,
+                    token=self.ks_client.auth_token)
             routers = neutron_client.list_routers(
                 name=self.uconfig['router-name'])
             if len(routers['routers']) == 0:
@@ -175,11 +254,17 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
             if len(networks['networks']) == 0:
                 hookenv.log("Floating network name not found")
             else:
-                network_info['floating-network-name'] = \
+                network_info['floating_network_name'] = \
                     self.uconfig['floating-network-name']
-        except:
-            hookenv.log("Neutron is not ready, deferring neutron query")
         return network_info
+
+    def service_present(self, service):
+        """Check if a given service type is registered in the catalogue
+
+        :params service: string Service type
+        @returns Boolean: True if service is registered
+        """
+        return service in self.get_present_services()
 
     @property
     def compute_info(self):
@@ -188,29 +273,28 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         @returns {'flavor_id' id1, 'flavor_alt_id': id2}
         """
         compute_info = {}
-        try:
-            nova_ep = self.ks_client.service_catalog.url_for(
-                service_type='compute',
-                endpoint_type='publicURL'
-            )
-            compute_info['nova_endpoint'] = nova_ep
+        if self.service_present('nova'):
+            if self.keystone_session:
+                nova_client = novaclient_client.Client(
+                    2, session=self.keystone_session)
+            else:
+                nova_client = novaclient_client.Client(
+                    2,
+                    self.keystone_info['service_username'],
+                    self.keystone_info['service_password'],
+                    self.keystone_info['service_tenant_name'],
+                    self.keystone_auth_url(),
+                )
+            nova_ep = self.resolve_endpoint('compute', 'public')
             url = urllib.parse.urlparse(nova_ep)
             compute_info['nova_base'] = '{}://{}'.format(
                 url.scheme,
                 url.netloc.split(':')[0])
-            nova_client = novaclient.client.Client(
-                self.keystone_info['service_username'],
-                self.keystone_info['service_password'],
-                self.keystone_info['service_tenant_name'],
-                self.keystone_auth_url,
-            )
             for flavor in nova_client.flavors.list():
                 if self.uconfig['flavor-name'] == flavor.name:
                     compute_info['flavor_id'] = flavor.id
                 if self.uconfig['flavor-alt-name'] == flavor.name:
                     compute_info['flavor_alt_id'] = flavor.id
-        except:
-            hookenv.log("Nova is not ready, deferring nova query")
         return compute_info
 
     def get_present_services(self):

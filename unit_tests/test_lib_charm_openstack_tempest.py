@@ -49,7 +49,7 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
             'service_password': 'pass1',
             'service_tenant_name': 'svc',
             'service_region': 'reg1'}
-        self.patch_object(tempest.keystoneclient.client, 'Client')
+        self.patch_object(tempest.keystoneclient_v2, 'Client')
         self.patch_object(tempest.hookenv, 'config')
         self.patch_object(
             tempest.adapters.OpenStackRelationAdapter, '__init__')
@@ -69,14 +69,11 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
     def test_ec2_creds(self):
         self.patch_object(tempest.hookenv, 'config')
         self.patch_object(tempest.TempestAdminAdapter, 'init_keystone_client')
-        self.patch_object(
-            tempest.adapters.OpenStackRelationAdapter, '__init__')
+        self.patch_object(tempest.TempestAdminAdapter, '_setup_properties')
         kc = mock.MagicMock()
-        creds = mock.MagicMock()
-        creds.access = 'ac2'
-        creds.secret = 'st2'
         kc.user_id = 'bob'
-        kc.ec2.list = lambda x: [creds]
+        kc.ec2.list = lambda x: [{'access_token': 'ac2',
+                                  'secret_token': 'st2'}]
         self.patch_object(tempest.TempestAdminAdapter, 'ks_client', new=kc)
         a = tempest.TempestAdminAdapter('rel2')
         self.assertEqual(a.ec2_creds, {'access_token': 'ac2',
@@ -85,6 +82,8 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
     def test_image_info(self):
         self.patch_object(tempest.hookenv, 'config')
         self.patch_object(tempest.TempestAdminAdapter, 'init_keystone_client')
+        self.patch_object(tempest.TempestAdminAdapter, 'service_present',
+                          return_value=True)
         self.patch_object(
             tempest.adapters.OpenStackRelationAdapter, '__init__')
         self.patch_object(tempest.TempestAdminAdapter, 'ks_client')
@@ -111,6 +110,8 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
 
     def test_network_info(self):
         self.patch_object(tempest.hookenv, 'config')
+        self.patch_object(tempest.TempestAdminAdapter, 'service_present',
+                          return_value=True)
         self.patch_object(tempest.TempestAdminAdapter, 'init_keystone_client')
         self.patch_object(
             tempest.adapters.OpenStackRelationAdapter, '__init__')
@@ -124,6 +125,7 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
         self.ks_client.return_value = kc
         self.config.return_value = {
             'router-name': 'route1',
+            'floating-network-name': 'ext_net',
             'network-name': 'net1'}
         nc = mock.MagicMock()
         nc.list_routers = lambda name=None: {'routers': [router1]}
@@ -132,11 +134,15 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
         a = tempest.TempestAdminAdapter('rel2')
         self.assertEqual(
             a.network_info,
-            {'public_network_id': 'pubnet1', 'router_id': '16'})
+            {'floating_network_name': 'ext_net',
+             'public_network_id': 'pubnet1',
+             'router_id': '16'})
 
     def test_compute_info(self):
         self.patch_object(tempest.hookenv, 'config')
         self.patch_object(tempest.TempestAdminAdapter, 'init_keystone_client')
+        self.patch_object(tempest.TempestAdminAdapter, 'service_present',
+                          return_value=True)
         self.patch_object(
             tempest.adapters.OpenStackRelationAdapter, '__init__')
         ki = {
@@ -151,14 +157,15 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
         self.patch_object(
             tempest.TempestAdminAdapter,
             'keystone_auth_url',
-            new='auth_url')
+            return_value='auth_url')
         self.config.return_value = {
+            'flavor-alt-name': None,
             'flavor-name': 'm3.huuge'}
         kc = mock.MagicMock()
         kc.service_catalog.url_for = \
             lambda service_type=None, endpoint_type=None: 'http://nova:999/bob'
         self.patch_object(tempest.TempestAdminAdapter, 'ks_client', new=kc)
-        self.patch_object(tempest.novaclient.client, 'Client')
+        self.patch_object(tempest.novaclient_client, 'Client')
         _flavor1 = mock.MagicMock()
         _flavor1.name = 'm3.huuge'
         _flavor1.id = 'id1'
@@ -170,8 +177,7 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
             a.compute_info,
             {
                 'flavor_id': 'id1',
-                'nova_base': 'http://nova',
-                'nova_endpoint': 'http://nova:999/bob'})
+                'nova_base': 'http://nova'})
 
     def test_get_present_services(self):
         self.patch_object(tempest.TempestAdminAdapter, 'init_keystone_client')
@@ -248,6 +254,16 @@ class TestTempestAdminAdapter(test_utils.PatchHelper):
                 'trove': 'false',
                 'zaqar': 'false',
                 'neutron': 'false'})
+
+    def test_service_present(self):
+        self.patch_object(tempest.TempestAdminAdapter, 'init_keystone_client')
+        self.patch_object(
+            tempest.adapters.OpenStackRelationAdapter, '__init__')
+        self.patch_object(tempest.TempestAdminAdapter, 'get_present_services',
+                          return_value=['svc1', 'svc2'])
+        a = tempest.TempestAdminAdapter('rel2')
+        self.assertTrue(a.service_present('svc1'))
+        self.assertFalse(a.service_present('svc3'))
 
 
 class TestTempestCharm(Helper):
