@@ -6,6 +6,8 @@ import urllib
 
 import glanceclient
 import keystoneauth1
+import keystoneauth1.identity.v2 as keystoneauth1_v2
+import keystoneauth1.session as keystoneauth1_session
 import keystoneclient.v2_0.client as keystoneclient_v2
 import keystoneclient.v3.client as keystoneclient_v3
 import keystoneclient.auth.identity.v3 as keystone_id_v3
@@ -266,6 +268,17 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         """
         return service in self.get_present_services()
 
+    def get_nova_client(self):
+        if not self.keystone_session:
+            auth = keystoneauth1_v2.Password(
+                auth_url=self.keystone_auth_url(),
+                username=self.keystone_info['service_username'],
+                password=self.keystone_info['service_password'],
+                tenant_name=self.keystone_info['service_tenant_name'])
+            self.keystone_session = keystoneauth1_session.Session(auth=auth)
+        return novaclient_client.Client(
+            2, session=self.keystone_session)
+
     @property
     def compute_info(self):
         """Return flavor ids for user-defined flavors
@@ -274,17 +287,7 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         """
         compute_info = {}
         if self.service_present('nova'):
-            if self.keystone_session:
-                nova_client = novaclient_client.Client(
-                    2, session=self.keystone_session)
-            else:
-                nova_client = novaclient_client.Client(
-                    2,
-                    self.keystone_info['service_username'],
-                    self.keystone_info['service_password'],
-                    self.keystone_info['service_tenant_name'],
-                    self.keystone_auth_url(),
-                )
+            nova_client = self.get_nova_client()
             nova_ep = self.resolve_endpoint('compute', 'public')
             url = urllib.parse.urlparse(nova_ep)
             compute_info['nova_base'] = '{}://{}'.format(
