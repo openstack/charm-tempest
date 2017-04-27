@@ -1,6 +1,3 @@
-import subprocess
-import json
-import time
 
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
@@ -98,36 +95,10 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
         u.log.debug('openstack release str: {}'.format(
             self._get_openstack_release_string()))
 
-    def _run_action(self, unit_id, action, *args):
-        command = ["juju", "action", "do", "--format=json", unit_id, action]
-        command.extend(args)
-        print("Running command: %s\n" % " ".join(command))
-        output = subprocess.check_output(command)
-        output_json = output.decode(encoding="UTF-8")
-        data = json.loads(output_json)
-        action_id = data[u'Action queued with id']
-        return action_id
-
-    def _wait_on_action(self, action_id):
-        command = ["juju", "action", "fetch", "--format=json", action_id]
-        while True:
-            try:
-                output = subprocess.check_output(command)
-            except Exception as e:
-                print(e)
-                return False
-            output_json = output.decode(encoding="UTF-8")
-            data = json.loads(output_json)
-            if data[u"status"] == "completed":
-                return True
-            elif data[u"status"] == "failed":
-                return False
-            time.sleep(2)
-
     def test_run_tempest(self):
         u.log.debug('Running Tempest...')
         unit = self.tempest_sentry
         assert u.status_get(unit)[0] == "active"
 
-        action_id = self._run_action(unit.info['unit_name'], "run-tempest")
-        assert self._wait_on_action(action_id), "run-tempest action failed."
+        action_id = u.run_action(unit, "run-tempest")
+        assert u.wait_on_action(action_id), "run-tempest action failed."
