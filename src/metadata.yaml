@@ -1,6 +1,6 @@
 name: tempest
 summary: OpenStack integration test suite
-maintainer: Liam young <liam.young@canonical.com>
+maintainer: OpenStack Charmers <openstack-charmers@lists.ubuntu.com>
 description: |
   Tempest is a set of integration tests to be run against a live Openstack
   cluster. Tempest has batteries of tests for Openstack API validation,
