@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+"""Amulet tests on a basic tempest deployment on xenial-pike."""
+
+from basic_deployment import TempestBasicDeployment
+
+if __name__ == '__main__':
+    # Tempest is installed through pip so cloud archive is not needed here
+    deployment = TempestBasicDeployment(series='xenial',
+                                        openstack='cloud:xenial-pike',
+                                        source='cloud:xenial-updates/pike')
+    deployment.run_tests()
