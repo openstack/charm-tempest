@@ -328,7 +328,7 @@ class TempestAdminAdapter(adapters.OpenStackRelationAdapter):
         # If not running in an action context asssume auto mode
         try:
             action_args = hookenv.action_get()
-        except:
+        except Exception as e:
             action_args = {'service-whitelist': 'auto'}
         if action_args['service-whitelist'] == 'auto':
             white_list = []
