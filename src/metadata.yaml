@@ -10,8 +10,8 @@ tags:
   - openstack
 series:
   - xenial
+  - bionic
   - artful
-  - zesty
   - trusty
 subordinate: false
 requires:
