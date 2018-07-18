@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+"""Amulet tests on a basic tempest deployment on bionic-rocky."""
+
+from basic_deployment import TempestBasicDeployment
+
+if __name__ == '__main__':
+    # Tempest is installed through pip so cloud archive is not needed here
+    deployment = TempestBasicDeployment(series='bionic',
+                                        openstack='cloud:bionic-rocky',
+                                        source='cloud:bionic-updates/rocky')
+    deployment.run_tests()
