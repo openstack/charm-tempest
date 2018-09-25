@@ -490,3 +490,30 @@ class TempestCharm(charm.OpenStackCharm):
         action_info = self.parse_tempest_log(logfile)
         action_info['tempest-logfile'] = logfile
         hookenv.action_set(action_info)
+
+
+class TempestCharmRocky(TempestCharm):
+
+    release = 'rocky'
+
+    packages = [
+        'git', 'testrepository', 'subunit', 'python3-nose', 'python3-lxml',
+        'python3-boto', 'python3-junitxml', 'python3-subunit',
+        'python3-testresources', 'python3-oslotest', 'python3-stevedore',
+        'python3-cinderclient', 'python3-glanceclient', 'python3-heatclient',
+        'python3-keystoneclient', 'python3-neutronclient',
+        'python3-novaclient', 'python3-swiftclient',
+        'python3-ceilometerclient', 'openvswitch-test', 'openvswitch-common',
+        'libffi-dev', 'libssl-dev', 'python3-dev', 'python3-cffi'
+    ]
+
+    purge_packages = [
+        'python-nose', 'python-lxml', 'python-boto', 'python-junitxml',
+        'python-subunit', 'python-testresources', 'python-oslotest',
+        'python-stevedore', 'python-cinderclient', 'python-glanceclient',
+        'python-heatclient', 'python-keystoneclient', 'python-neutronclient',
+        'python-novaclient', 'python-swiftclient', 'python-ceilometerclient',
+        'python-dev', 'python-cffi'
+    ]
+
+    python_version = 3
