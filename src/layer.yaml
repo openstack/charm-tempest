@@ -1,1 +1,5 @@
 includes: ['layer:openstack', 'interface:keystone-admin']
+options:
+  basic:
+    include_system_packages: True
+    packages: ['python3-apt']
