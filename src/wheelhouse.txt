@@ -1,0 +1,5 @@
+keystoneauth1
+pbr
+python-glanceclient
+python-novaclient
+python-neutronclient
