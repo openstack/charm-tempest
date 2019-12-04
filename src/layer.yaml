@@ -3,3 +3,4 @@ options:
   basic:
     use_venv: True
     include_system_packages: False
+    python_packages: ['keystoneauth1', 'python-glanceclient', 'python-novaclient', 'python-neutronclient']
