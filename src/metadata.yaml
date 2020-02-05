@@ -12,7 +12,6 @@ series:
   - xenial
   - bionic
   - eoan
-  - disco
 subordinate: false
 requires:
   identity-admin:
