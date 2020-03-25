@@ -67,8 +67,6 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
 
     def _configure_services(self):
         """Configure all of the services."""
-        keystone_config = {'admin-password': 'openstack',
-                           'admin-token': 'ubuntutesting'}
         pxc_config = {
             'dataset-size': '25%',
             'max-connections': 1000,
@@ -76,7 +74,6 @@ class TempestBasicDeployment(OpenStackAmuletDeployment):
             'sst-password': 'ChangeMe123',
         }
         configs = {
-            'keystone': keystone_config,
             'percona-cluster': pxc_config,
         }
         super(TempestBasicDeployment, self)._configure_services(configs)
