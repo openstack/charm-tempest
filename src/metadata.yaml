@@ -7,12 +7,13 @@ description: |
   scenarios, and other specific tests useful in validating an Openstack
   deployment.
 tags:
-  - openstack
+- openstack
 series:
-  - xenial
-  - bionic
-  - eoan
-  - focal
+- xenial
+- bionic
+- eoan
+- focal
+- groovy
 subordinate: false
 requires:
   identity-admin:
