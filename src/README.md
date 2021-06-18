@@ -1,5 +1,8 @@
 # Overview
 
+> **WARNING**: DO NOT USE OR CONTRIBUTE.
+> [THIS CHARM IS DEPRECATED](https://docs.openstack.org/charm-guide/latest/openstack-charms.html).
+
 This charm exists to provide an example integration of Tempest, for the purpose
 of test and reference.  It is not intended for production use in any case.
 

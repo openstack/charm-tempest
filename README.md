@@ -1,5 +1,8 @@
 # Overview
 
+> **WARNING**: DO NOT USE OR CONTRIBUTE.
+> [THIS CHARM IS DEPRECATED](https://docs.openstack.org/charm-guide/latest/openstack-charms.html).
+
 This is a "source" charm, which is intended to be strictly the top
 layer of a built charm.  This structure declares that any included
 layer assets are not intended to be consumed as a layer from a
