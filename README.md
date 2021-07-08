@@ -18,4 +18,4 @@ tox -e build
 
 # Contact Information
 
-Freenode IRC: #openstack-charms
+OFTC IRC: #openstack-charms

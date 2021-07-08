@@ -19,7 +19,7 @@ an OpenStack deployment to execute sets or subsets of Tempest tests.
 NOTICE: At this time, the Tempest charm is in development and is in a
 proof-of-concept alpha state.
 
-Development and related discussion occurs on the Freenode #openstack-charms IRC
+Development and related discussion occurs on the OFTC #openstack-charms IRC
 channel.
 
 TLDR:  Deploy the built charm and relate it to keystone and openstack-dashboard.
@@ -34,4 +34,4 @@ juju run-action tempest/0 run-tempest --wait
 # Contact Information
 
 See the [OpenStack Charm Guide](http://docs.openstack.org/developer/charm-guide/)
-or discuss on Freenode IRC: #openstack-charms
+or discuss on OFTC IRC: #openstack-charms
